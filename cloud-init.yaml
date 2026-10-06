@@ -1,0 +1,10 @@
+#cloud-config
+# Injects your SSH public key into each VM so Ansible can reach it over SSH.
+# The placeholder below is replaced automatically by setup.sh.
+users:
+  - default
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__

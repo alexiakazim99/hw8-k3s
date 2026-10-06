@@ -1,0 +1,67 @@
+# =============================================================
+# playbook.yml - installs a HA k3s cluster, fully automated.
+#   - server_first : first control-plane, starts embedded etcd
+#   - server_rest  : extra control-planes, join as servers
+#   - agents       : workers
+# Run:  ansible-playbook -i inventory.ini playbook.yml
+# =============================================================
+
+- name: First control-plane (cluster-init)
+  hosts: server_first
+  become: true
+  tasks:
+    - name: Install k3s on the first server (starts the cluster)
+      shell: |
+        curl -sfL https://get.k3s.io | \
+        INSTALL_K3S_EXEC="server --cluster-init --tls-san {{ server1_ip }}" \
+        K3S_TOKEN="{{ k3s_token }}" sh -
+      args:
+        creates: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for the node to be ready
+      shell: k3s kubectl get nodes
+      register: result
+      until: "'Ready' in result.stdout"
+      retries: 20
+      delay: 10
+
+- name: Extra control-planes (join as servers)
+  hosts: server_rest
+  become: true
+  serial: 1                       # join one at a time (etcd quorum safety)
+  tasks:
+    - name: Install k3s and join as an additional server
+      shell: |
+        curl -sfL https://get.k3s.io | \
+        INSTALL_K3S_EXEC="server --server https://{{ server1_ip }}:6443 --tls-san {{ server1_ip }}" \
+        K3S_TOKEN="{{ k3s_token }}" sh -
+      args:
+        creates: /etc/rancher/k3s/k3s.yaml
+
+- name: Workers (join as agents)
+  hosts: agents
+  become: true
+  tasks:
+    - name: Install k3s agent and join the cluster
+      shell: |
+        curl -sfL https://get.k3s.io | \
+        K3S_URL="https://{{ server1_ip }}:6443" \
+        K3S_TOKEN="{{ k3s_token }}" sh -
+      args:
+        creates: /etc/rancher/k3s/k3s-agent-uninstall.sh
+
+- name: Fetch kubeconfig to your laptop
+  hosts: server_first
+  become: true
+  tasks:
+    - name: Read kubeconfig from server-1
+      slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: kubeconfig
+
+    - name: Save it locally as ./kubeconfig (server IP patched in)
+      delegate_to: localhost
+      become: false
+      copy:
+        content: "{{ kubeconfig.content | b64decode | replace('127.0.0.1', server1_ip) }}"
+        dest: ./kubeconfig

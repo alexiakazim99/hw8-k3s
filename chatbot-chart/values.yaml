@@ -1,0 +1,8 @@
+# Inställningar du enkelt kan ändra utan att röra mallarna.
+image:
+  repository: alexiakazim/chatbot   # din image på Docker Hub
+  tag: latest
+replicaCount: 2                     # antal kopior av chatboten
+service:
+  port: 5001                        # porten appen lyssnar på
+  nodePort: 30080                   # porten du når den på: http://<nod-ip>:30080

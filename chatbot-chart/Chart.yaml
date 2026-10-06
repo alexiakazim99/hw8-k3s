@@ -1,0 +1,6 @@
+apiVersion: v2
+name: chatbot
+description: HW7-chatboten körd på k3s-klustret via Helm
+type: application
+version: 0.1.0
+appVersion: "1.0"
